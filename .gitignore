@@ -27,7 +27,7 @@ env/
 
 # working directory
 source/data/
-source/log
+source/experiment
 
 # data file
 *.pkl
