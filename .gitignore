@@ -28,6 +28,7 @@ env/
 # working directory
 source/data/
 source/experiment
+source/out_models
 
 # data file
 *.pkl
