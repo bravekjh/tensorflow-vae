@@ -18,9 +18,9 @@ height = pickle.load(open('height.pkl', 'rb'))
 
 # network parameters
 input_dim = 1 # height data input
-encoder_hidden_dim = 64
-decoder_hidden_dim = 64
-latent_dim = 1
+encoder_hidden_dim = 16
+decoder_hidden_dim = 16
+latent_dim = 2
 lam = 0 # lambda
 
 
@@ -62,38 +62,18 @@ l2_loss += tf.nn.l2_loss(weights["encoder_logvar"])
 logvar_encoder = tf.matmul(hidden_encoder, weights["encoder_logvar"]) + biases["encoder_logvar"]
 
 
-# sampling
-## sample epsilon
-epsilon = tf.random_normal(tf.shape(logvar_encoder), name='epsilon')
-
-## sample latent variable
-std_encoder = tf.exp(0.5 * logvar_encoder)
-z = mu_encoder + tf.mul(std_encoder, epsilon)
-
-
-# decoder
-## decoder_h1
-l2_loss += tf.nn.l2_loss(weights["decoder_h1"])
-hidden_decoder = tf.nn.relu(tf.matmul(z, weights["decoder_h1"]) + biases["decoder_h1"])
-
-## decoder_reconstruction
-l2_loss += tf.nn.l2_loss(weights["decoder_reconstruction"])
-x_hat = tf.matmul(hidden_decoder, weights["decoder_reconstruction"]) + biases["decoder_reconstruction"]
-
-
 # get latent representation over test set
 batch_size = 50
 train_iter = int(height.train.num_examples / batch_size)
 test_iter = int(height.test.num_examples / batch_size)
-train = np.zeros((train_iter * batch_size, 3))
-test = np.zeros((test_iter * batch_size, 3))
-
-saver = tf.train.Saver()
+train = np.zeros((train_iter * batch_size, latent_dim*2+1)) # [mu, logvar, class_label]
+test = np.zeros((test_iter * batch_size, latent_dim*2+1)) # [mu, logvar, class_label]
 
 with tf.Session() as sess:
     ckpt = tf.train.get_checkpoint_state('out_models/')
     if ckpt:
         last_model = ckpt.model_checkpoint_path
+        saver = tf.train.Saver()
         saver.restore(sess, last_model)
     else:
         print("No trained model was found.")
@@ -128,3 +108,5 @@ print("# Evaluation")
 print(" - Male: 0")
 print(" - Female: 1")
 print(classification_report(test[:,-1], predictions))
+
+print('Done.')

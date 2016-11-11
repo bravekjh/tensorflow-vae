@@ -13,18 +13,23 @@ height = pickle.load(open('height.pkl', 'rb'))
 
 # network parameters
 input_dim = 1 # height data input
-encoder_hidden_dim = 64
-decoder_hidden_dim = 64
-latent_dim = 1
+encoder_hidden_dim = 16
+decoder_hidden_dim = 16
+latent_dim = 2
 lam = 0.0 # lambda
 
 # define weight shape
+def xavier_init(fan_in, fan_out, constant=1):
+    low = -constant*np.sqrt(6.0/(fan_in + fan_out))
+    high = constant*np.sqrt(6.0/(fan_in + fan_out))
+    return tf.random_uniform((fan_in, fan_out), minval=low, maxval=high, dtype=tf.float32)
+
 weights = {
-    "encoder_h1": tf.Variable(tf.zeros([input_dim, encoder_hidden_dim])),
-    "encoder_mu": tf.Variable(tf.zeros([encoder_hidden_dim, latent_dim])),
-    "encoder_logvar": tf.Variable(tf.zeros([encoder_hidden_dim, latent_dim])),
-    "decoder_h1": tf.Variable(tf.zeros([latent_dim, decoder_hidden_dim])),
-    "decoder_reconstruction": tf.Variable(tf.zeros([decoder_hidden_dim, input_dim]))
+    "encoder_h1": tf.Variable(xavier_init(input_dim, encoder_hidden_dim)),
+    "encoder_mu": tf.Variable(xavier_init(encoder_hidden_dim, latent_dim)),
+    "encoder_logvar": tf.Variable(xavier_init(encoder_hidden_dim, latent_dim)),
+    "decoder_h1": tf.Variable(xavier_init(latent_dim, decoder_hidden_dim)),
+    "decoder_reconstruction": tf.Variable(xavier_init(decoder_hidden_dim, input_dim)),
 }
 
 # define bias shape
@@ -33,7 +38,7 @@ biases = {
     "encoder_mu": tf.Variable(tf.zeros([latent_dim])),
     "encoder_logvar": tf.Variable(tf.zeros([latent_dim])),
     "decoder_h1": tf.Variable(tf.zeros([decoder_hidden_dim])),
-    "decoder_reconstruction": tf.Variable(tf.zeros([input_dim]))
+    "decoder_reconstruction": tf.Variable(tf.zeros([input_dim])),
 }
 
 # encoder
@@ -56,7 +61,7 @@ logvar_encoder = tf.add(tf.matmul(hidden_encoder, weights["encoder_logvar"]), bi
 
 # sampling
 ## sample epsilon
-epsilon = tf.random_normal(tf.shape(logvar_encoder), name='epsilon')
+epsilon = tf.random_normal(tf.shape(logvar_encoder), dtype=tf.float32, name='epsilon')
 
 ## sample latent variable
 std_encoder = tf.exp(tf.mul(0.5, logvar_encoder))
@@ -73,7 +78,7 @@ l2_loss += tf.nn.l2_loss(weights["decoder_reconstruction"])
 x_hat = tf.add(tf.matmul(hidden_decoder, weights["decoder_reconstruction"]), biases["decoder_reconstruction"])
 
 # calculate loss
-kl_divergence = -0.5 * tf.reduce_sum(1 + logvar_encoder - tf.pow(mu_encoder, 2) - tf.exp(logvar_encoder), reduction_indices=1)
+kl_divergence = -0.5 * tf.reduce_sum(1 + logvar_encoder - tf.square(mu_encoder) - tf.exp(logvar_encoder), reduction_indices=1)
 bce = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(x_hat, x), reduction_indices=1)
 loss = tf.reduce_mean(tf.add(kl_divergence, bce))
 regularized_loss = tf.add(loss, tf.mul(lam, l2_loss))
@@ -88,7 +93,7 @@ saver = tf.train.Saver()
 
 
 # training
-n_epoch = 100
+n_epoch = 500
 batch_size = 50
 display_step = 1
 
@@ -106,3 +111,5 @@ with tf.Session() as sess:
         print("# epoch{0:5d}: loss={1:.5f}".format(epoch, current_loss))
 
     save_path = saver.save(sess, "out_models/model.ckpt")
+
+print('Done.')
